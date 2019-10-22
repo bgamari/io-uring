@@ -1,0 +1,28 @@
+cabal-version:       >=1.10
+name:                linux-io-uring
+version:             0.1.0.0
+-- synopsis:
+-- description:
+-- bug-reports:
+-- license:
+license-file:        LICENSE
+author:              Ben Gamari
+maintainer:          ben@smart-cactus.org
+copyright:           (c) 2019 Ben Gamari
+category:            System
+build-type:          Simple
+extra-source-files:  CHANGELOG.md
+
+library
+  exposed-modules:     System.Linux.IO.URing
+  build-depends:       base >=4.12 && <4.13
+  other-extensions:    RecordWildCards, DataKinds
+  default-language:    Haskell2010
+
+executable io-uring
+  main-is:             Main.hs
+  -- other-modules:
+  -- other-extensions:
+  build-depends:       base >=4.12 && <4.13
+  -- hs-source-dirs:
+  default-language:    Haskell2010
