@@ -3,8 +3,6 @@
 
 module System.Linux.IO.URing where
 
-import GHC.Base
-
 import Foreign.C.Types (CInt(..), CShort(..))
 import Foreign.Ptr (Ptr)
 import Foreign.ForeignPtr
@@ -16,48 +14,33 @@ import System.Linux.IO.URing.Cqe
 import System.Linux.IO.URing.Ring
 import System.Linux.IO.URing.Sqe
 
+#include "hs_uring.h"
 
 pollAdd :: URing -> Fd -> Event -> IO URing
 pollAdd uring fd event = do
-    hi
+  undefined
 
 submit :: URing -> IO ()
 submit (URing fptr) =
-    throwIfNeg_ (const "io_uring_submit")
-    $ withForeignPtr fptr c_io_uring_submit
+  undefined
 
 waitCqe :: URing -> Cqe -> IO ()
-waitCqr (URing fptr) cqe = do
-    throwIfNeg_ (const "io_uring_wait_cqe")
-    $ withForeignPtr fptr c_io_uring_wait_cqe
+waitCqe (URing fptr) cqe = do
+  undefined
 
-postSqe :: SRing -> Sqe -> IO ()
+postSqe :: URing -> Sqe -> IO ()
 postSqe ring sqe = do
-    writeBarrer
-    hi
-    writeBarrer
+  undefined
+  writeBarrier
+  undefined
+  writeBarrier
 
-popCqes :: CRing -> IO [Cqe]
+popCqes :: URing -> IO [Cqe]
 popCqes = undefined
 
 readBarrier :: IO ()
-readBarrier = return ()
+readBarrier = undefined
 
 writeBarrier :: IO ()
-writeBarrier = return ()
-
-foreign import ccall safe "liburing.h io_uring_queue_init"
-    c_io_uring_queue_init :: CInt -> Ptr URing -> CInt -> IO CInt
-
-foreign import ccall safe "liburing.h io_uring_queue_exit"
-    cp_io_uring_queue_exit :: FunPtr (Ptr URing -> CNfds -> CInt -> IO CInt)
-
-foreign import ccall safe "liburing.h io_uring_submit"
-    c_io_uring_submit :: Ptr URing -> IO CInt
-
-foreign import ccall safe "liburing.h io_uring_wait_cqe"
-    c_io_uring_wait_cqe :: Ptr URing -> Ptr Cqe -> IO CInt
-
-foreign import ccall unsafe "liburing.h io_uring_cqe_seen"
-    c_io_uring_cqe_seen :: Ptr URing -> Ptr Cqe -> IO CInt
+writeBarrier = undefined
 

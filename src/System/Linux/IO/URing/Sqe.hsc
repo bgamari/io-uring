@@ -1,55 +1,53 @@
-module System.Linux.IO.URing.Sqe (Sqe) where
+{-# LANGUAGE RecordWildCards #-}
+
+module System.Linux.IO.URing.Sqe
+  ( Sqe(..)
+  , pokeSqe
+  ) where
 
 import Data.Word
 import Data.Int
-import Foreign.C.Types
+import System.Posix.Types
+import Foreign.Ptr
+import Foreign.Storable
+import Foreign.Marshal.Utils (fillBytes)
 import System.Linux.IO.URing.PollEvent
 
 #include "io_uring.h"
 
 -- | Submission Queue Entry
 data Sqe
-  = PollAdd { sqeFd         :: !Int32
-            , sqePollEvents :: !Event
-            , sqeUserData   :: !Word64
-            , sqeBufIndex   :: !Word16
+  = PollAdd { sqeFd          :: !Fd
+            , sqePollEvents  :: !Event
+            , sqeUserData    :: !Word64
+            , sqeBufIndex    :: !Word16
             }
-  | PollRemove { }
+  | PollRemove { sqeUserData :: !Word64
+               }
 
-instance Storable Sqe where
-    sizeOf _ = #size struct io_uring_sqe
-    alignment _ = #alignment struct io_uring_sqe
-    peek ptr =
-        opcode <- #{peek struct io_uring_sqe, opcode} ptr
-        case opcode of
-          (#const IORING_OP_POLL_ADD) ->
-                PollAdd
-                    <$> #{peek struct io_uring_sqe, fd} ptr
-                    <*> #{peek struct io_uring_sqe, poll_events} ptr
-                    <*> #{peek struct io_uring_sqe, user_data} ptr
-                    <*> #{peek struct io_uring_sqe, buf_index} ptr
-            _ -> fail "unknown IORING_OP"
-    poke ptr sqe =
-        zeroIt
-        setUserData (sqeUserData sqe)
+pokeSqe :: Ptr Sqe -> Sqe -> IO ()
+pokeSqe ptr sqe = do
+    zeroIt
+    setUserData (sqeUserData sqe)
 
-        case sqe of
-          PollAdd {..} -> do
-            setOpCode (#const IORING_OP_POLL_ADD)
-            setFd sqeFd
-            #{poke struct io_uring_sqe, poll_events} ptr sqePollEvents
-          PollRemove {..} -> do
-            setOpCode (#const IORING_OP_POLL_REMOVE)
-            setFd sqeFd
-      where
-        zeroIt :: IO ()
-        zeroIt = fillBytes ptr 0 (#size struct io_uring_sqe)
+    case sqe of
+      PollAdd {..} -> do
+        setOpCode (#const IORING_OP_POLL_ADD)
+        setFd sqeFd
+        #{poke struct io_uring_sqe, poll_events} ptr sqePollEvents
+      PollRemove {..} -> do
+        setOpCode (#const IORING_OP_POLL_REMOVE)
+        setFd (-1)
+        #{poke struct io_uring_sqe, addr} ptr sqeUserData
+  where
+    zeroIt :: IO ()
+    zeroIt = fillBytes ptr 0 (#size struct io_uring_sqe)
 
-        setOpCode :: Int32 -> IO ()
-        setOpCode = #{poke struct io_uring_sqe, opcode} ptr
+    setOpCode :: Int32 -> IO ()
+    setOpCode = #{poke struct io_uring_sqe, opcode} ptr
 
-        setFd :: Fd -> IO ()
-        setFd = #{poke struct io_uring_sqe, fd} ptr
+    setFd :: Fd -> IO ()
+    setFd fd = #{poke struct io_uring_sqe, fd} ptr (fromIntegral fd :: Word32)
 
-        setUserData :: Word64 -> IO ()
-        setUserData = #{poke struct io_uring_sqe, user_data} ptr
+    setUserData :: Word64 -> IO ()
+    setUserData = #{poke struct io_uring_sqe, user_data} ptr

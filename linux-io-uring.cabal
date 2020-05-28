@@ -21,6 +21,7 @@ library
                        System.Linux.IO.URing.Ring
                        System.Linux.IO.URing.Sqe
   hs-source-dirs:      src
+  c-sources:           cbits/hs_uring.c
   include-dirs:        include
   ghc-options:         -Wall
   build-depends:       base >=4.12 && <4.13
