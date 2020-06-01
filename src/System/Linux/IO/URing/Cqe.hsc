@@ -12,7 +12,7 @@ import Foreign.Storable
 data Cqe
   = Cqe { cqeUserData   :: !Word64
         , cqeRes        :: !Int32
-        , cqeFlags      :: !Int32
+        , cqeFlags      :: !Word32
         }
   deriving (Show)
 

@@ -1,6 +1,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module System.Linux.IO.URing.Ring
   ( URing
@@ -17,7 +18,7 @@ import Data.Word
 
 import Foreign.C.Error
 import Foreign.C.Types (CInt(..), CUInt(..))
-import Foreign.Ptr (Ptr, nullPtr, plusPtr, FunPtr)
+import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr, FunPtr)
 import Foreign.ForeignPtr
 import Foreign.Storable (Storable(..))
 
@@ -39,6 +40,7 @@ data SubmissionQueue
   = SQ { uringSQHead     :: !(Ptr Word32)
        , uringSQTail     :: !(Ptr Word32)
        , uringSQRingMask :: !(Ptr Word32)
+       , uringSQArray    :: !(Ptr SqeIndex)
        , uringSQEArray   :: !(Ptr Sqe)
        }
 
@@ -59,10 +61,11 @@ newURing entries = do
     HsURing {..} <- peekHsURing u
     let uringSQ =
           SQ
-            { uringSQHead     = sqPtr sqroHead
-            , uringSQTail     = sqPtr sqroTail
-            , uringSQRingMask = sqPtr sqroRingMask
-            , uringSQEArray   = sqPtr sqroRingEntries
+            { uringSQHead     =           sqPtr sqroHead
+            , uringSQTail     =           sqPtr sqroTail
+            , uringSQRingMask =           sqPtr sqroRingMask
+            , uringSQArray    = castPtr $ sqPtr sqroArray
+            , uringSQEArray   = sqeAperture
             }
           where sqPtr field = sqAperture `plusPtr` fromIntegral (field $ uringpSQRingOffsets params)
           
@@ -84,6 +87,25 @@ newURing entries = do
                    , ..
                    }
 
+-- | An index in the SQ ring.
+newtype SqRingIndex = SqRingIndex Word32
+  deriving (Eq, Ord, Show, Storable)
+
+-- | An index of the SQ entries array.
+newtype SqeIndex = SqeIndex Word32
+  deriving (Eq, Ord, Show, Storable)
+
+-- | Set the SQE index at the given entry in the SQ array.
+setSqIndex :: URing -> SqRingIndex -> SqeIndex -> IO ()
+setSqIndex uring (SqRingIndex i) (SqeIndex x) =
+    poke (arr `plusPtr` fromIntegral i) x
+  where arr = uringSQArray $ uringSQ uring
+
+-- | A pointer to the 'Sqe' at the given 'SqeIndex'.
+sqePtr :: URing -> SqeIndex -> Ptr Sqe
+sqePtr uring (SqeIndex i) =
+    uringSQEArray (uringSQ uring) `plusPtr` fromIntegral i
+
 submit :: URing
        -> Int       -- ^ number to submit
        -> Maybe Int -- ^ minimum to complete
@@ -102,13 +124,21 @@ pushSQ uring push = do
     tail0 <- peek (uringSQTail $ uringSQ uring)
     readBarrier
     mask <- peek (uringSQRingMask $ uringSQ uring)
-    let index = tail0 .&. mask
-    let tail_ptr = uringSQEArray (uringSQ uring) `plusPtr` fromIntegral index
-    print ("Push", tail_ptr)
+    -- Currently we enforce a one-to-one correspondence between SQs slots and SQEs
+    let sq_index  = SqRingIndex (tail0 .&. mask)
+    let sqe_index = SqeIndex    (tail0 .&. mask)
+    let tail_ptr  = sqePtr uring sqe_index
     (n_pushed, r) <- push tail_ptr
-    let tail' = tail0 + fromIntegral n_pushed
+
+    flip mapM_ [0..fromIntegral (n_pushed - 1)] $ \i -> do
+        let sq  = SqRingIndex  ((tail0 + i) .&. mask)
+        let sqe = SqeIndex     ((tail0 + i) .&. mask)
+        setSqIndex uring sq sqe
+
     writeBarrier
+    let tail' = tail0 + fromIntegral n_pushed
     poke (uringSQTail $ uringSQ uring) tail'
+    writeBarrier
     return r
 
 popCQ :: URing -> IO (Maybe Cqe)
@@ -194,7 +224,7 @@ peekSQRingOffsets p =
     <*> #{peek struct io_sqring_offsets, array}        p
 
 data HsURing
-    = HsURing { sqeAperture :: !(Ptr ())
+    = HsURing { sqeAperture :: !(Ptr Sqe)
               , sqAperture  :: !(Ptr ())
               , cqAperture  :: !(Ptr ())
               , hsURingFd     :: !CInt

@@ -75,7 +75,7 @@ pokeSqe ptr sqe = do
     setAddr :: Ptr a -> IO ()
     setAddr = #{poke struct io_uring_sqe, addr} ptr
 
-    setFlags :: Word32 -> IO ()
+    setFlags :: Word8 -> IO ()
     setFlags = #{poke struct io_uring_sqe, flags} ptr
 
     setFd :: Fd -> IO ()

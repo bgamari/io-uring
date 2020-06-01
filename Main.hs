@@ -23,7 +23,7 @@ main = do
     buf <- mallocArray0 len
     let iovecs = [IoVec buf (fromIntegral len)]
     withArrayLen iovecs $ \iovecsCnt iovecsPtr -> do
-      postSqe uring $ Readv fd iovecsPtr (fromIntegral iovecsCnt) 0
+      postSqe uring $ Readv fd iovecsPtr (fromIntegral iovecsCnt) 0xdeadbeef
       n <- submit uring 1 (Just 1)
       print n
 
