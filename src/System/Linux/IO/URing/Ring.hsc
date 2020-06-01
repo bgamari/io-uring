@@ -21,6 +21,7 @@ import Foreign.Ptr (Ptr, nullPtr, plusPtr, FunPtr)
 import Foreign.ForeignPtr
 import Foreign.Storable (Storable(..))
 
+import System.Linux.IO.URing.Barrier
 import System.Linux.IO.URing.Sqe
 import System.Linux.IO.URing.Cqe
 
@@ -74,6 +75,10 @@ newURing entries = do
             }
           where cqPtr field = cqAperture `plusPtr` fromIntegral (field $ uringpCQRingOffsets params)
 
+    let dbg lbl x = putStrLn $ lbl ++ ": " ++ show x
+    dbg "sqe array" $ uringSQEArray uringSQ
+    dbg "sqe tail"  $ uringSQTail uringSQ
+
     return $ URing { uringFptr = fptr
                    , uringFd = hsURingFd
                    , ..
@@ -99,6 +104,7 @@ pushSQ uring push = do
     mask <- peek (uringSQRingMask $ uringSQ uring)
     let index = tail0 .&. mask
     let tail_ptr = uringSQEArray (uringSQ uring) `plusPtr` fromIntegral index
+    print ("Push", tail_ptr)
     (n_pushed, r) <- push tail_ptr
     let tail' = tail0 + fromIntegral n_pushed
     writeBarrier
@@ -118,13 +124,6 @@ popCQ uring = do
         cqe <- peek (uringCQArray (uringCQ uring) `plusPtr` fromIntegral index)
         poke (uringCQHead $ uringCQ uring) (succ hd)
         return (Just cqe)
-
-
-writeBarrier :: IO ()
-writeBarrier = return () -- TODO
-
-readBarrier :: IO ()
-readBarrier = return ()  -- TODO
 
 
 -----------------------------------------------------------
@@ -222,3 +221,4 @@ foreign import ccall "io_uring_enter"
                      -> CUInt   -- ^ flags
                      -> Ptr a   -- ^ sig
                      -> IO CInt
+

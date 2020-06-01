@@ -1,4 +1,4 @@
-cabal-version:       >=1.10
+cabal-version:       3.0
 name:                linux-io-uring
 version:             0.1.0.0
 -- synopsis:
@@ -21,9 +21,11 @@ library
                        System.Linux.IO.URing.IoVec
                        System.Linux.IO.URing.Ring
                        System.Linux.IO.URing.Sqe
+                       System.Linux.IO.URing.Barrier
   hs-source-dirs:      src
   c-sources:           cbits/hs_uring.c
                        cbits/syscall.c
+  cmm-sources:         cbits/barriers.cmm
   include-dirs:        include
   ghc-options:         -Wall
   build-depends:       base >=4.12 && <4.16
