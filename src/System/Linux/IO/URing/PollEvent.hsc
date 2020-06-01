@@ -28,4 +28,3 @@ newtype Event = Event CShort
  , pollErr   = POLLERR
  , pollHup   = POLLHUP
  }
-

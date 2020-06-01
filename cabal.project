@@ -1,0 +1,8 @@
+packages: .
+with-compiler: /nix/store/z9hplpp91s3s8k8gsj5wvhnsqpvijz0p-ghc-8.8.3/bin/ghc
+
+package linux-io-uring
+  --ghc-options: -g3
+  debug-info: 3
+  executable-stripping: False
+  library-stripping: False

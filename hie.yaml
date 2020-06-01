@@ -1,0 +1,1 @@
+cradle: { cabal: { component: "lib:linux-io-uring" }}

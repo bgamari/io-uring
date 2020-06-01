@@ -9,10 +9,12 @@ import Foreign.Storable
 #include "io_uring.h"
 
 -- | Completion Queue Entry
-data Cqe = Cqe { cqeUserData   :: !Word64
-               , cqeRes        :: !Int32
-               , cqeFlags      :: !Int32
-               }
+data Cqe
+  = Cqe { cqeUserData   :: !Word64
+        , cqeRes        :: !Int32
+        , cqeFlags      :: !Int32
+        }
+  deriving (Show)
 
 instance Storable Cqe where
     sizeOf _ = #size struct io_uring_cqe

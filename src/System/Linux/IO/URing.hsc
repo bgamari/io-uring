@@ -20,20 +20,13 @@ pollAdd :: URing -> Fd -> Event -> IO URing
 pollAdd uring fd event = do
   undefined
 
-submit :: URing -> IO ()
-submit (URing fptr) =
-  undefined
-
 waitCqe :: URing -> Cqe -> IO ()
-waitCqe (URing fptr) cqe = do
+waitCqe cqe = do
   undefined
 
 postSqe :: URing -> Sqe -> IO ()
-postSqe ring sqe = do
-  undefined
-  writeBarrier
-  undefined
-  writeBarrier
+postSqe uring sqe = do
+  pushSQ uring $ \tl -> pokeSqe tl sqe >> return (1, ())
 
 popCqes :: URing -> IO [Cqe]
 popCqes = undefined
@@ -43,4 +36,3 @@ readBarrier = undefined
 
 writeBarrier :: IO ()
 writeBarrier = undefined
-

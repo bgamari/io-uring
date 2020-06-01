@@ -2,34 +2,50 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
 
-module System.Linux.IO.URing.Ring where
+module System.Linux.IO.URing.Ring
+  ( URing
+  , newURing
+  , submit
+  , pushSQ
+  , popCQ
+  ) where
 
 import GHC.Base
+import Data.Bits
+import Data.Maybe
 import Data.Word
 
-import Foreign.C.Types (CInt(..))
+import Foreign.C.Error
+import Foreign.C.Types (CInt(..), CUInt(..))
 import Foreign.Ptr (Ptr, nullPtr, plusPtr, FunPtr)
 import Foreign.ForeignPtr
 import Foreign.Storable (Storable(..))
 
+import System.Linux.IO.URing.Sqe
+import System.Linux.IO.URing.Cqe
+
 #include "io_uring.h"
 #include "hs_uring.h"
 
-data URing = URing { uringFptr :: !(ForeignPtr HsURing) 
-                   , uringSubmissionQueue :: !SubmissionQueue
-                   , uringCompletionQueue :: !CompletionQueue
-                   }
+data URing
+  = URing { uringFptr    :: !(ForeignPtr HsURing) 
+          , uringFd      :: !CInt
+          , uringSQ      :: !SubmissionQueue
+          , uringCQ      :: !CompletionQueue
+          }
 
 data SubmissionQueue
-  = SQ { uringSQHead   :: !(Ptr Word32)
-       , uringSQTail   :: !(Ptr Word32)
-       , uringSQEArray :: !(Ptr Word32)
+  = SQ { uringSQHead     :: !(Ptr Word32)
+       , uringSQTail     :: !(Ptr Word32)
+       , uringSQRingMask :: !(Ptr Word32)
+       , uringSQEArray   :: !(Ptr Sqe)
        }
 
 data CompletionQueue
-  = CQ { uringCQHead  :: !(Ptr Word32)
-       , uringCQTail  :: !(Ptr Word32)
-       , uringCQArray :: !(Ptr Word32)
+  = CQ { uringCQHead     :: !(Ptr Word32)
+       , uringCQTail     :: !(Ptr Word32)
+       , uringCQRingMask :: !(Ptr Word32)
+       , uringCQArray    :: !(Ptr Cqe)
        }
 
 newURing :: Int -> IO URing
@@ -39,28 +55,81 @@ newURing entries = do
       $ fail "Failed to create uring"
     fptr <- newForeignPtr c_free_uring u
 
-    HsURing {..} <- peek u
-    let uringSubmissionQueue =
-          SubmissionQueue
-            { uringSQHead = sqAperture `plusPtr` sqroHead params 
-            , uringSQTail = sqAperture `plusPtr` sqroTail params 
-            , uringSQRingMask = sqAperture `plusPtr` sqroRingMask params 
+    HsURing {..} <- peekHsURing u
+    let uringSQ =
+          SQ
+            { uringSQHead     = sqPtr sqroHead
+            , uringSQTail     = sqPtr sqroTail
+            , uringSQRingMask = sqPtr sqroRingMask
+            , uringSQEArray   = sqPtr sqroRingEntries
             }
-        uringCompletionQueue =
-          CompletionQueue
-            { uringCQHead = sqAperture `plusPtr` cqroHead params
-            , uringCQTail = sqAperture `plusPtr` cqroTail params
-            , uringCQTail = sqAperture `plusPtr` cqroTail params
+          where sqPtr field = sqAperture `plusPtr` fromIntegral (field $ uringpSQRingOffsets params)
+          
+        uringCQ =
+          CQ
+            { uringCQHead     = cqPtr cqroHead
+            , uringCQTail     = cqPtr cqroTail
+            , uringCQRingMask = cqPtr cqroRingMask
+            , uringCQArray    = cqPtr cqroCqes
             }
+          where cqPtr field = cqAperture `plusPtr` fromIntegral (field $ uringpCQRingOffsets params)
 
     return $ URing { uringFptr = fptr
+                   , uringFd = hsURingFd
                    , ..
                    }
 
-sqRingOffset, cqRingOffset, sqesOffset :: Word64
-sqRingOffset = #const IORING_OFF_SQ_RING
-cqRingOffset = #const IORING_OFF_CQ_RING
-sqesOffset   = #const IORING_OFF_SQES
+submit :: URing
+       -> Int       -- ^ number to submit
+       -> Maybe Int -- ^ minimum to complete
+       -> IO Int
+submit uring to_submit min_complete = do
+    let flags = if isJust min_complete then #{const IORING_ENTER_GETEVENTS} else 0
+    fmap fromIntegral $ throwErrnoIfMinus1 "io_uring_enter" $ c_io_uring_enter
+      (uringFd uring)
+      (fromIntegral to_submit)
+      (maybe 0 fromIntegral min_complete)
+      flags
+      nullPtr
+
+pushSQ :: URing -> (Ptr Sqe -> IO (Int, a)) -> IO a
+pushSQ uring push = do
+    tail0 <- peek (uringSQTail $ uringSQ uring)
+    readBarrier
+    mask <- peek (uringSQRingMask $ uringSQ uring)
+    let index = tail0 .&. mask
+    let tail_ptr = uringSQEArray (uringSQ uring) `plusPtr` fromIntegral index
+    (n_pushed, r) <- push tail_ptr
+    let tail' = tail0 + fromIntegral n_pushed
+    writeBarrier
+    poke (uringSQTail $ uringSQ uring) tail'
+    return r
+
+popCQ :: URing -> IO (Maybe Cqe)
+popCQ uring = do
+    hd <- peek $ uringCQHead $ uringCQ uring
+    tl <- peek $ uringCQTail $ uringCQ uring
+    if hd == tl
+      then return Nothing
+      else do
+        readBarrier
+        mask <- peek (uringCQRingMask $ uringCQ uring)
+        let index = hd .&. mask
+        cqe <- peek (uringCQArray (uringCQ uring) `plusPtr` fromIntegral index)
+        poke (uringCQHead $ uringCQ uring) (succ hd)
+        return (Just cqe)
+
+
+writeBarrier :: IO ()
+writeBarrier = return () -- TODO
+
+readBarrier :: IO ()
+readBarrier = return ()  -- TODO
+
+
+-----------------------------------------------------------
+-- The C interface
+-----------------------------------------------------------
 
 data IOURingParams
   = IOURingParams { uringpSQEntries     :: !Word32
@@ -96,12 +165,12 @@ data CQRingOffsets
 peekCQRingOffsets :: Ptr CQRingOffsets -> IO CQRingOffsets
 peekCQRingOffsets p =
   CQRingOffsets
-    <$> #{peek struct io_cqring_offsets, head} p
-    <*> #{peek struct io_cqring_offsets, tail} p
-    <*> #{peek struct io_cqring_offsets, ring_mask} p
+    <$> #{peek struct io_cqring_offsets, head}         p
+    <*> #{peek struct io_cqring_offsets, tail}         p
+    <*> #{peek struct io_cqring_offsets, ring_mask}    p
     <*> #{peek struct io_cqring_offsets, ring_entries} p
-    <*> #{peek struct io_cqring_offsets, overflow} p
-    <*> #{peek struct io_cqring_offsets, cqes} p
+    <*> #{peek struct io_cqring_offsets, overflow}     p
+    <*> #{peek struct io_cqring_offsets, cqes}         p
 
 -- | @struct io_sqring_offsets@.
 data SQRingOffsets
@@ -117,22 +186,19 @@ data SQRingOffsets
 peekSQRingOffsets :: Ptr SQRingOffsets -> IO SQRingOffsets
 peekSQRingOffsets p =
   SQRingOffsets
-    <$> #{peek struct io_sqring_offsets, head} p
-    <*> #{peek struct io_sqring_offsets, tail} p
-    <*> #{peek struct io_sqring_offsets, ring_mask} p
+    <$> #{peek struct io_sqring_offsets, head}         p
+    <*> #{peek struct io_sqring_offsets, tail}         p
+    <*> #{peek struct io_sqring_offsets, ring_mask}    p
     <*> #{peek struct io_sqring_offsets, ring_entries} p
-    <*> #{peek struct io_sqring_offsets, flags} p
-    <*> #{peek struct io_sqring_offsets, dropped} p
-    <*> #{peek struct io_sqring_offsets, array} p
-
-mkURing :: Int -> IO URing
-mkURing entries = do
-  return undefined
+    <*> #{peek struct io_sqring_offsets, flags}        p
+    <*> #{peek struct io_sqring_offsets, dropped}      p
+    <*> #{peek struct io_sqring_offsets, array}        p
 
 data HsURing
     = HsURing { sqeAperture :: !(Ptr ())
               , sqAperture  :: !(Ptr ())
               , cqAperture  :: !(Ptr ())
+              , hsURingFd     :: !CInt
               , params      :: !IOURingParams
               }
 
@@ -140,11 +206,19 @@ peekHsURing :: Ptr HsURing -> IO HsURing
 peekHsURing p =
   HsURing
     <$> #{peek struct hs_uring, sqe_aperture} p
-    <*> #{peek struct hs_uring, sq_aperture} p
-    <*> #{peek struct hs_uring, cq_aperture} p
-    <*> #{peek struct hs_uring, params} p
+    <*> #{peek struct hs_uring, sq_aperture}  p
+    <*> #{peek struct hs_uring, cq_aperture}  p
+    <*> #{peek struct hs_uring, uring_fd}     p
+    <*> peekIOURingParams (#{ptr struct hs_uring, params} p)
 
 foreign import ccall "hs_new_uring"
     c_new_uring :: CInt -> IO (Ptr HsURing)
 foreign import ccall "&hs_free_uring"
     c_free_uring :: FunPtr (Ptr HsURing -> IO ())
+foreign import ccall "io_uring_enter"
+    c_io_uring_enter :: CInt    -- ^ fd
+                     -> CUInt   -- ^ to_submit
+                     -> CUInt   -- ^ min_complete
+                     -> CUInt   -- ^ flags
+                     -> Ptr a   -- ^ sig
+                     -> IO CInt

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "io_uring.h"
 
 struct hs_uring {
