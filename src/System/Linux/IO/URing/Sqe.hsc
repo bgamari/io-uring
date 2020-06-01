@@ -18,23 +18,33 @@ import System.Linux.IO.URing.IoVec
 
 #include "io_uring.h"
 
+-- | The user data word attached to each SQE.
+type UserData = Word64
 
 -- | Submission Queue Entry
 data Sqe
   = PollAdd
       { sqeFd         :: !Fd
       , sqePollEvents :: !Event
-      , sqeUserData   :: !Word64
+      , sqeUserData   :: !UserData
       , sqeBufIndex   :: !Word16
       }
   | PollRemove
-      { sqeUserData   :: !Word64
+      { sqeUserData   :: !UserData
       }
   | Readv 
       { sqeFd         :: !Fd
       , sqeIoVecs     :: !(Ptr IoVec)
       , sqeIoVecCnt   :: !Word32
-      , sqeUserData   :: !Word64
+      , sqeOffset     :: !Word64
+      , sqeUserData   :: !UserData
+      }
+  | Writev
+      { sqeFd         :: !Fd
+      , sqeIoVecs     :: !(Ptr IoVec)
+      , sqeIoVecCnt   :: !Word32
+      , sqeOffset     :: !Word64
+      , sqeUserData   :: !UserData
       }
 
 pokeSqe :: Ptr Sqe -> Sqe -> IO ()
@@ -55,7 +65,14 @@ pokeSqe ptr sqe = do
       Readv {..} -> do
         setOpCode (#const IORING_OP_READV)
         setFd sqeFd
-        setOff 0
+        setOff sqeOffset
+        setAddr sqeIoVecs
+        setLen sqeIoVecCnt
+        setFlags 0
+      Writev {..} -> do
+        setOpCode (#const IORING_OP_WRITEV)
+        setFd sqeFd
+        setOff sqeOffset
         setAddr sqeIoVecs
         setLen sqeIoVecCnt
         setFlags 0
