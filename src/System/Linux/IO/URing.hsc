@@ -24,7 +24,7 @@ waitCqe :: URing -> Cqe -> IO ()
 waitCqe cqe = do
   undefined
 
-postSqe :: URing -> Sqe -> IO ()
+postSqe :: URing -> Sqe -> IO (Maybe ())
 postSqe uring sqe = do
   pushSQ uring $ \tl -> pokeSqe tl sqe >> return (1, ())
 

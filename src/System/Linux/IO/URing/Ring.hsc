@@ -52,6 +52,7 @@ data CompletionQueue
        , uringCQArray    :: !(Ptr Cqe)
        }
 
+-- | Create a new io-uring.
 newURing :: Int -> IO URing
 newURing entries = do
     u <- c_new_uring (fromIntegral entries)
@@ -78,10 +79,6 @@ newURing entries = do
             , uringCQArray    = cqPtr cqroCqes
             }
           where cqPtr field = cqAperture `plusPtr` fromIntegral (field $ uringpCQRingOffsets params)
-
-    let dbg lbl x = putStrLn $ lbl ++ ": " ++ show x
-    dbg "sqe array" $ uringSQEArray uringSQ
-    dbg "sqe tail"  $ uringSQTail uringSQ
 
     return $ URing { uringFptr = fptr
                    , uringFd = hsURingFd
@@ -121,8 +118,9 @@ submit uring to_submit min_complete = do
       flags
       nullPtr
 
-pushSQ :: URing -> (Ptr Sqe -> IO (Int, a)) -> IO a
+pushSQ :: URing -> (Ptr Sqe -> IO (Int, a)) -> IO (Maybe a)
 pushSQ uring push = do
+      -- TODO: Handle overflow
     tail0 <- peek (uringSQTail $ uringSQ uring)
     readBarrier
     mask <- peek (uringSQRingMask $ uringSQ uring)
@@ -141,7 +139,7 @@ pushSQ uring push = do
     let tail' = tail0 + fromIntegral n_pushed
     poke (uringSQTail $ uringSQ uring) tail'
     writeBarrier
-    return r
+    return (Just r)
 
 popCQ :: URing -> IO (Maybe Cqe)
 popCQ uring = do

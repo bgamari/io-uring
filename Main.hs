@@ -23,13 +23,28 @@ main = do
     buf <- mallocArray0 len
     let iovecs = [IoVec buf (fromIntegral len)]
     withArrayLen iovecs $ \iovecsCnt iovecsPtr -> do
-      postSqe uring $ Readv fd iovecsPtr (fromIntegral iovecsCnt) 0xdeadbeef
+      postSqe uring $ Readv fd iovecsPtr (fromIntegral iovecsCnt) 0 1111
       n <- submit uring 1 (Just 1)
       print n
 
     cqe <- popCQ uring
     print cqe
 
+    closeFd fd
+    fd <- openFd "testing" WriteOnly (Just 0o666) defaultFileFlags
+
+    withArrayLen iovecs $ \iovecsCnt iovecsPtr -> do
+      postSqe uring $ Writev fd iovecsPtr (fromIntegral iovecsCnt) 0 2222
+      n <- submit uring 1 (Just 1)
+      print n
+
+    cqe <- popCQ uring
+    print cqe
+
+    cqe <- popCQ uring
+    print cqe
+
     bufBs <- BS.unsafePackCStringLen (castPtr buf, len)
     print bufBs
+    closeFd fd
     putStrLn "done"
