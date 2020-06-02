@@ -4,6 +4,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 
 import Foreign.Marshal.Array
+import Foreign.Marshal.Utils
 import Foreign.Ptr
 import System.Posix.IO
 
@@ -24,11 +25,13 @@ main = do
     let iovecs = [IoVec buf (fromIntegral len)]
     withArrayLen iovecs $ \iovecsCnt iovecsPtr -> do
       postSqe uring (readv fd 0 iovecsPtr (fromIntegral iovecsCnt) 1111) >>= print
-      n <- submit uring 1 (Just 1)
-      print n
+      submit uring 1 (Just 1) >>= print
+      popCQ uring >>= print
 
-    cqe <- popCQ uring
-    print cqe
+    with (Timespec 2 0) $ \tsPtr -> do
+      postSqe uring (timeout tsPtr 3333)
+      submit uring 1 (Just 1) >>= print
+      popCQ uring >>= print
 
     closeFd fd
     fd <- openFd "testing" WriteOnly (Just 0o666) defaultFileFlags
@@ -37,12 +40,8 @@ main = do
       postSqe uring (writev fd 0 iovecsPtr (fromIntegral iovecsCnt) 2222) >>= print
       n <- submit uring 1 (Just 1)
       print n
-
-    cqe <- popCQ uring
-    print cqe
-
-    cqe <- popCQ uring
-    print cqe
+      popCQ uring >>= print
+      popCQ uring >>= print
 
     bufBs <- BS.unsafePackCStringLen (castPtr buf, len)
     print bufBs

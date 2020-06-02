@@ -191,19 +191,21 @@ instance Storable Timespec where
 
 -- | Completes after the given amount of time has elapsed.
 timeout :: Ptr Timespec -> UserData -> SqeBuilder ()
-timeout ts userd = timeoutNCompletions ts 0 userd
+timeout ts userd = timeoutNCompletions (Just ts) 0 userd
 
 -- | Completes when @n@ commands have completed since this command was started.
 nCompletions :: Int -> UserData -> SqeBuilder ()
-nCompletions n userd = timeoutNCompletions nullPtr n userd
+nCompletions n userd = timeoutNCompletions Nothing n userd
 
 -- | Completes when *either* @n@ commands have completed or the given amount of
 -- time has elapsed, whichever happens first.
-timeoutNCompletions :: Ptr Timespec -> Int -> UserData -> SqeBuilder ()
+timeoutNCompletions :: Maybe (Ptr Timespec) -> Int -> UserData -> SqeBuilder ()
 timeoutNCompletions ts n userd = do
     zeroIt
     setOpCode #{const IORING_OP_TIMEOUT}
-    setAddr ts
+    case ts of
+      Just ptr -> setAddr ptr >> setLen 1
+      Nothing  -> return ()
     setOff (fromIntegral n)
     setUserData userd
 
