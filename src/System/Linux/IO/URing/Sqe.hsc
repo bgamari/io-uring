@@ -3,6 +3,7 @@
 module System.Linux.IO.URing.Sqe
   ( Sqe(..)
   , pokeSqe
+  , sqeSize
   ) where
 
 import Data.Word
@@ -100,3 +101,7 @@ pokeSqe ptr sqe = do
 
     setUserData :: Word64 -> IO ()
     setUserData = #{poke struct io_uring_sqe, user_data} ptr
+
+
+sqeSize :: Integral a => a
+sqeSize = #{size struct io_uring_sqe}

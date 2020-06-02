@@ -19,6 +19,7 @@ import Data.Word
 import Foreign.C.Error
 import Foreign.C.Types (CInt(..), CUInt(..))
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr, FunPtr)
+import Foreign.Marshal.Array (advancePtr)
 import Foreign.ForeignPtr
 import Foreign.Storable (Storable(..))
 
@@ -97,14 +98,15 @@ newtype SqeIndex = SqeIndex Word32
 
 -- | Set the SQE index at the given entry in the SQ array.
 setSqIndex :: URing -> SqRingIndex -> SqeIndex -> IO ()
-setSqIndex uring (SqRingIndex i) (SqeIndex x) =
-    poke (arr `plusPtr` fromIntegral i) x
+setSqIndex uring (SqRingIndex i) x =
+    poke (arr `advancePtr` fromIntegral i) x
   where arr = uringSQArray $ uringSQ uring
 
 -- | A pointer to the 'Sqe' at the given 'SqeIndex'.
 sqePtr :: URing -> SqeIndex -> Ptr Sqe
 sqePtr uring (SqeIndex i) =
-    uringSQEArray (uringSQ uring) `plusPtr` fromIntegral i
+    uringSQEArray (uringSQ uring) `plusPtr` off
+  where off = fromIntegral i * sqeSize
 
 submit :: URing
        -> Int       -- ^ number to submit
