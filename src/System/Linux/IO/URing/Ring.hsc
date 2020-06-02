@@ -121,13 +121,16 @@ sqePtr uring (SqeIndex i) =
     uringSQEArray (uringSQ uring) `plusPtr` off
   where off = fromIntegral i * sqeSize
 
+-- | A pointer to the 'Cqe' at the given 'CqeIndex'.
 cqePtr :: URing -> CqeIndex -> Ptr Cqe
 cqePtr uring (CqeIndex i) =
-    uringSQEArray (uringSQ uring) `plusPtr` off
+    uringCQArray (uringCQ uring) `plusPtr` off
   where
     off = fromIntegral i * cqeSize
     cqeSize = Foreign.Storable.sizeOf (undefined :: Cqe)
 
+-- | Notify the kernel of new SQ submissions, optionally blocking until some
+-- have completed.
 submit :: URing
        -> Int       -- ^ number to submit
        -> Maybe Int -- ^ minimum to complete
@@ -141,6 +144,7 @@ submit uring to_submit min_complete = do
       flags
       nullPtr
 
+-- | Grab a fresh SQE from the free list.
 getSqe :: URing -> IO (Maybe SqeIndex)
 getSqe uring = do
     sqeIdx <- readPVar (uringFreeSqe uring)
@@ -151,12 +155,14 @@ getSqe uring = do
         writePVar (uringFreeSqe uring) next
         return $ Just sqeIdx
 
+-- | Return an SQE to the free list.
 freeSqe :: URing -> SqeIndex -> IO ()
 freeSqe uring sqeIdx = do
     old <- readPVar (uringFreeSqe uring)
     pokeSqeLink (sqePtr uring sqeIdx) old
     writePVar (uringFreeSqe uring) sqeIdx
 
+-- | Push a SQE on to the submission queue. Returns 'False' if the SQ is full.
 pushSqe :: URing -> SqeIndex -> IO Bool
 pushSqe uring sqeIdx = do
     tail0 <- peek (uringSQTail $ uringSQ uring)
@@ -174,6 +180,7 @@ pushSqe uring sqeIdx = do
         writeBarrier
         return True
 
+-- | Pop a completion off of the completion queue.
 popCQ :: URing -> IO (Maybe Cqe)
 popCQ uring = do
     hd <- peek $ uringCQHead $ uringCQ uring
@@ -216,7 +223,7 @@ peekIOURingParams p =
 
 -- | @struct io_cqring_offsets@.
 data CQRingOffsets
-  = CQRingOffsets { cqroHead        :: !Word32 
+  = CQRingOffsets { cqroHead        :: !Word32
                   , cqroTail        :: !Word32
                   , cqroRingMask    :: !Word32
                   , cqroRingEntries :: !Word32
@@ -236,7 +243,7 @@ peekCQRingOffsets p =
 
 -- | @struct io_sqring_offsets@.
 data SQRingOffsets
-  = SQRingOffsets { sqroHead        :: !Word32 
+  = SQRingOffsets { sqroHead        :: !Word32
                   , sqroTail        :: !Word32
                   , sqroRingMask    :: !Word32
                   , sqroRingEntries :: !Word32
