@@ -2,7 +2,7 @@
 #include <sys/syscall.h>
 #include <sys/uio.h>
 #include <signal.h>
-#include "io_uring.h"
+#include "syscall.h"
 
 #ifdef __alpha__
 /*
