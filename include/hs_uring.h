@@ -1,6 +1,6 @@
 #pragma once
 
-#include "io_uring.h"
+#include <linux/io_uring.h>
 
 struct hs_uring {
   void *sqe_aperture;

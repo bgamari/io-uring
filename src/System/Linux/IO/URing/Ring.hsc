@@ -31,7 +31,7 @@ import System.Linux.IO.URing.Sqe
 import System.Linux.IO.URing.Cqe
 import System.Linux.IO.URing.PVar
 
-#include "io_uring.h"
+#include <linux/io_uring.h>
 #include "hs_uring.h"
 
 data URing
