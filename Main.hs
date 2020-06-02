@@ -9,9 +9,6 @@ import Foreign.Ptr
 import System.Posix.IO
 
 import System.Linux.IO.URing
-import System.Linux.IO.URing.IoVec
-import System.Linux.IO.URing.Sqe
-import System.Linux.IO.URing.Ring
 
 main :: IO ()
 main = do

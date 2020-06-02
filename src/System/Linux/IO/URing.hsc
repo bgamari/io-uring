@@ -4,20 +4,28 @@
 module System.Linux.IO.URing
   ( newURing
   , postSqe
+  , submit
   , popCq
     -- * Requests
-  , nop
-  , fsync
-  , fdatasync
+    -- ** Polling
   , pollAdd
-  , readv
-  , writev
+    -- ** Timeout
   , nCompletions
   , timeout
   , timeoutNCompletions
   , Timespec(..)
+    -- ** Vectored I/O
+  , IoVec(..)
+  , readv
+  , writev
+    -- ** fsync
+  , fsync
+  , fdatasync
+    -- ** Miscellaneous
+  , nop
   ) where
 
+import System.Linux.IO.URing.IoVec
 import System.Linux.IO.URing.Ring
 import System.Linux.IO.URing.Sqe
 
