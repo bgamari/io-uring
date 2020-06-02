@@ -46,6 +46,10 @@ import System.Linux.IO.URing.PVar
 
 #include "io_uring.h"
 
+-----------------------------------------------------------------------------
+-- Types
+-----------------------------------------------------------------------------
+
 -- | An index of the SQ entries array.
 newtype SqeIndex = SqeIndex Word32
   deriving (Eq, Ord, Show, Storable, Enum, Prim)
@@ -72,6 +76,10 @@ instance Monad SqeBuilder where
     case g r of
       SqeBuilder g' -> g' p
 
+
+-----------------------------------------------------------------------------
+-- Builder primitives
+-----------------------------------------------------------------------------
 
 zeroIt :: SqeBuilder ()
 zeroIt = SqeBuilder $ \ptr -> fillBytes ptr 0 (#size struct io_uring_sqe)
@@ -107,6 +115,10 @@ peekSqeLink = #{peek struct io_uring_sqe, fd}
 pokeSqeLink :: Ptr Sqe -> SqeIndex -> IO ()
 pokeSqeLink = #{poke struct io_uring_sqe, fd}
 
+-----------------------------------------------------------------------------
+-- Modifiers
+-----------------------------------------------------------------------------
+
 modifyFlags :: (Word8 -> Word8) -> SqeBuilder a -> SqeBuilder a
 modifyFlags f action = do
     r <- action
@@ -124,6 +136,10 @@ drain = modifyFlags (.|. iO_DRAIN)
 chained :: SqeBuilder () -> SqeBuilder ()
 chained = modifyFlags (.|. iO_LINK)
   where iO_LINK = #{const IOSQE_IO_LINK}
+
+-----------------------------------------------------------------------------
+-- Command types
+-----------------------------------------------------------------------------
 
 -- | Poll.
 pollAdd
@@ -226,6 +242,11 @@ writev fd offset iovs iov_cnt userd = do
 
 sqeSize :: Integral a => a
 sqeSize = #{size struct io_uring_sqe}
+
+
+-----------------------------------------------------------------------------
+-- Debugging
+-----------------------------------------------------------------------------
 
 dumpSqe :: Ptr Sqe -> IO String
 dumpSqe ptr =
