@@ -121,6 +121,13 @@ sqePtr uring (SqeIndex i) =
     uringSQEArray (uringSQ uring) `plusPtr` off
   where off = fromIntegral i * sqeSize
 
+cqePtr :: URing -> CqeIndex -> Ptr Cqe
+cqePtr uring (CqeIndex i) =
+    uringSQEArray (uringSQ uring) `plusPtr` off
+  where
+    off = fromIntegral i * cqeSize
+    cqeSize = Foreign.Storable.sizeOf (undefined :: Cqe)
+
 submit :: URing
        -> Int       -- ^ number to submit
        -> Maybe Int -- ^ minimum to complete
@@ -176,8 +183,8 @@ popCQ uring = do
       else do
         readBarrier
         mask <- peek (uringCQRingMask $ uringCQ uring)
-        let index = hd .&. mask
-        cqe <- peek (uringCQArray (uringCQ uring) `plusPtr` fromIntegral index)
+        let index = CqeIndex $ hd .&. mask
+        cqe <- peek (cqePtr uring index)
         poke (uringCQHead $ uringCQ uring) (succ hd)
         return (Just cqe)
 

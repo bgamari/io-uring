@@ -1,12 +1,17 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module System.Linux.IO.URing.Cqe (Cqe(..))  where
+module System.Linux.IO.URing.Cqe (Cqe(..), CqeIndex(..))  where
 
 import Data.Word
 import Data.Int
 import Foreign.Storable
 
 #include "io_uring.h"
+
+-- | An index of the CQ entries array.
+newtype CqeIndex = CqeIndex Word32
+  deriving (Eq, Ord, Show, Enum)
 
 -- | Completion Queue Entry
 data Cqe
@@ -27,3 +32,4 @@ instance Storable Cqe where
         #{poke struct io_uring_cqe, user_data} ptr cqeUserData
         #{poke struct io_uring_cqe, res} ptr cqeRes
         #{poke struct io_uring_cqe, flags} ptr cqeFlags
+
