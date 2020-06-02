@@ -62,9 +62,7 @@ data CompletionQueue
 -- | Create a new io-uring.
 newURing :: Int -> IO URing
 newURing entries = do
-    u <- c_new_uring (fromIntegral entries)
-    when (u == nullPtr)
-      $ fail "Failed to create uring"
+    u <- throwErrnoIfNull "new_uring" $ c_new_uring (fromIntegral entries)
     fptr <- newForeignPtr c_free_uring u
 
     HsURing {..} <- peekHsURing u
