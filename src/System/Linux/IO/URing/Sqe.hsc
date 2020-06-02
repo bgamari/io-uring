@@ -7,9 +7,18 @@
 module System.Linux.IO.URing.Sqe
   (
     -- * Operations
-    pollAdd
+    nop
+  , fsync
+  , fdatasync
+  , pollAdd
   , readv
   , writev
+  , nCompletions
+  , timeout
+  , Timespec(..)
+    -- ** Modifiers
+  , chained
+  , drain
     -- * Types
   , SqeIndex(..)
   , Sqe
@@ -25,6 +34,7 @@ module System.Linux.IO.URing.Sqe
 
 import Data.Word
 import Data.Int
+import Data.Bits
 import System.Posix.Types
 import Foreign.Ptr
 import Foreign.Storable
@@ -97,6 +107,24 @@ peekSqeLink = #{peek struct io_uring_sqe, fd}
 pokeSqeLink :: Ptr Sqe -> SqeIndex -> IO ()
 pokeSqeLink = #{poke struct io_uring_sqe, fd}
 
+modifyFlags :: (Word8 -> Word8) -> SqeBuilder a -> SqeBuilder a
+modifyFlags f action = do
+    r <- action
+    flags <- SqeBuilder $ #{peek struct io_uring_sqe, flags}
+    setFlags (f flags)
+    return r
+
+-- | Mark an SQE as a full pipeline barrier.
+drain :: SqeBuilder () -> SqeBuilder ()
+drain = modifyFlags (.|. iO_DRAIN)
+  where iO_DRAIN = #{const IOSQE_IO_DRAIN}
+
+-- | Ensure that no subsequent SQEs execute before this one has completed
+-- successfully.
+chained :: SqeBuilder () -> SqeBuilder ()
+chained = modifyFlags (.|. iO_LINK)
+  where iO_LINK = #{const IOSQE_IO_LINK}
+
 -- | Poll.
 pollAdd
   :: Fd
@@ -109,6 +137,51 @@ pollAdd fd events userd = do
     setFd fd
     setUserData userd
     pokeField #{poke struct io_uring_sqe, poll_events} events
+
+-- | No operation.
+nop :: SqeBuilder ()
+nop = do
+    zeroIt
+    setOpCode #{const IORING_OP_NOP}
+
+-- | Flush metadata and writes to a file.
+fsync :: Fd -> SqeBuilder ()
+fsync fd = do
+    zeroIt
+    setOpCode #{const IORING_OP_FSYNC}
+    setFd fd
+
+-- | Flush writes to a file.
+fdatasync :: Fd -> SqeBuilder ()
+fdatasync fd = do
+    zeroIt
+    setOpCode #{const IORING_OP_FSYNC}
+    setFd fd
+    setFlags #{const IORING_FSYNC_DATASYNC}
+
+data Timespec = Timespec { tv_sec :: Int64, tv_nsec :: Int64 }
+
+instance Storable Timespec where
+  sizeOf _ = 16
+  alignment _ = 8
+  poke p (Timespec s ns) = pokeElemOff p' 0 s >> pokeElemOff p' 1 ns
+    where p' = castPtr p
+  peek p = Timespec <$> peekElemOff p' 0 <*> peekElemOff p' 1
+    where p' = castPtr p
+
+-- | Completes after the given amount of time has elapsed.
+timeout :: Ptr Timespec -> SqeBuilder ()
+timeout ts = do
+    zeroIt
+    setOpCode #{const IORING_OP_TIMEOUT}
+    setAddr ts
+
+-- | Completes when @n@ commands have completed since this command was started.
+nCompletions :: Int -> SqeBuilder ()
+nCompletions n = do
+    zeroIt
+    setOpCode #{const IORING_OP_TIMEOUT}
+    setOff (fromIntegral n)
 
 -- | Vectored read.
 readv
