@@ -139,25 +139,28 @@ pollAdd fd events userd = do
     pokeField #{poke struct io_uring_sqe, poll_events} events
 
 -- | No operation.
-nop :: SqeBuilder ()
-nop = do
+nop :: UserData -> SqeBuilder ()
+nop userd = do
     zeroIt
     setOpCode #{const IORING_OP_NOP}
+    setUserData userd
 
 -- | Flush metadata and writes to a file.
-fsync :: Fd -> SqeBuilder ()
-fsync fd = do
+fsync :: Fd -> UserData -> SqeBuilder ()
+fsync fd userd = do
     zeroIt
     setOpCode #{const IORING_OP_FSYNC}
     setFd fd
+    setUserData userd
 
 -- | Flush writes to a file.
-fdatasync :: Fd -> SqeBuilder ()
-fdatasync fd = do
+fdatasync :: Fd -> UserData -> SqeBuilder ()
+fdatasync fd userd = do
     zeroIt
     setOpCode #{const IORING_OP_FSYNC}
     setFd fd
     setFlags #{const IORING_FSYNC_DATASYNC}
+    setUserData userd
 
 data Timespec = Timespec { tv_sec :: Int64, tv_nsec :: Int64 }
 
@@ -170,18 +173,20 @@ instance Storable Timespec where
     where p' = castPtr p
 
 -- | Completes after the given amount of time has elapsed.
-timeout :: Ptr Timespec -> SqeBuilder ()
-timeout ts = do
+timeout :: Ptr Timespec -> UserData -> SqeBuilder ()
+timeout ts userd = do
     zeroIt
     setOpCode #{const IORING_OP_TIMEOUT}
     setAddr ts
+    setUserData userd
 
 -- | Completes when @n@ commands have completed since this command was started.
-nCompletions :: Int -> SqeBuilder ()
-nCompletions n = do
+nCompletions :: Int -> UserData -> SqeBuilder ()
+nCompletions n userd = do
     zeroIt
     setOpCode #{const IORING_OP_TIMEOUT}
     setOff (fromIntegral n)
+    setUserData userd
 
 -- | Vectored read.
 readv
