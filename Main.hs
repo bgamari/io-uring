@@ -23,7 +23,7 @@ main = do
     buf <- mallocArray0 len
     let iovecs = [IoVec buf (fromIntegral len)]
     withArrayLen iovecs $ \iovecsCnt iovecsPtr -> do
-      postSqe uring $ Readv fd iovecsPtr (fromIntegral iovecsCnt) 0 1111
+      postSqe uring (readv fd 0 iovecsPtr (fromIntegral iovecsCnt) 1111) >>= print
       n <- submit uring 1 (Just 1)
       print n
 
@@ -34,7 +34,7 @@ main = do
     fd <- openFd "testing" WriteOnly (Just 0o666) defaultFileFlags
 
     withArrayLen iovecs $ \iovecsCnt iovecsPtr -> do
-      postSqe uring $ Writev fd iovecsPtr (fromIntegral iovecsCnt) 0 2222
+      postSqe uring (writev fd 0 iovecsPtr (fromIntegral iovecsCnt) 2222) >>= print
       n <- submit uring 1 (Just 1)
       print n
 

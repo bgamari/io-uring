@@ -3,10 +3,6 @@
 
 module System.Linux.IO.URing where
 
-import Foreign.C.Types (CInt(..), CShort(..))
-import Foreign.Ptr (Ptr)
-import Foreign.ForeignPtr
-import Foreign.Storable (Storable(..))
 import System.Posix.Types (Fd)
 
 import System.Linux.IO.URing.PollEvent
@@ -24,9 +20,15 @@ waitCqe :: URing -> Cqe -> IO ()
 waitCqe cqe = do
   undefined
 
-postSqe :: URing -> Sqe -> IO (Maybe ())
+postSqe :: URing -> SqeBuilder a -> IO (Maybe a)
 postSqe uring sqe = do
-  pushSQ uring $ \tl -> pokeSqe tl sqe >> return (1, ())
+  sqeIdx_mb <- getSqe uring
+  case sqeIdx_mb of
+    Just sqeIdx -> do
+      r <- pokeSqe sqe (sqePtr uring sqeIdx)
+      pushSqe uring sqeIdx
+      return (Just r)
+    Nothing -> return Nothing
 
 popCqes :: URing -> IO [Cqe]
 popCqes = undefined

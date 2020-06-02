@@ -22,6 +22,7 @@ library
                        System.Linux.IO.URing.Ring
                        System.Linux.IO.URing.Sqe
                        System.Linux.IO.URing.Barrier
+                       System.Linux.IO.URing.PVar
   hs-source-dirs:      src
   c-sources:           cbits/hs_uring.c
                        cbits/syscall.c

@@ -7,7 +7,10 @@ module System.Linux.IO.URing.Ring
   ( URing
   , newURing
   , submit
-  , pushSQ
+  , getSqe
+  , freeSqe
+  , pushSqe
+  , sqePtr
   , popCQ
   ) where
 
@@ -26,15 +29,19 @@ import Foreign.Storable (Storable(..))
 import System.Linux.IO.URing.Barrier
 import System.Linux.IO.URing.Sqe
 import System.Linux.IO.URing.Cqe
+import System.Linux.IO.URing.PVar
 
 #include "io_uring.h"
 #include "hs_uring.h"
 
 data URing
-  = URing { uringFptr    :: !(ForeignPtr HsURing) 
+  = URing { uringFptr    :: !(ForeignPtr HsURing)
           , uringFd      :: !CInt
           , uringSQ      :: !SubmissionQueue
           , uringCQ      :: !CompletionQueue
+          , uringFreeSqe :: !(PVar SqeIndex)
+            -- ^ this is the head of a linked-listed of available 'SqeIndex's,
+            -- linked via the fd field.
           }
 
 data SubmissionQueue
@@ -70,7 +77,7 @@ newURing entries = do
             , uringSQEArray   = sqeAperture
             }
           where sqPtr field = sqAperture `plusPtr` fromIntegral (field $ uringpSQRingOffsets params)
-          
+
         uringCQ =
           CQ
             { uringCQHead     = cqPtr cqroHead
@@ -80,17 +87,26 @@ newURing entries = do
             }
           where cqPtr field = cqAperture `plusPtr` fromIntegral (field $ uringpCQRingOffsets params)
 
-    return $ URing { uringFptr = fptr
-                   , uringFd = hsURingFd
-                   , ..
-                   }
+    uringFreeSqe <- newPVar (SqeIndex 0)
+    let uring = URing { uringFptr = fptr
+                      , uringFd = hsURingFd
+                      , ..
+                      }
+
+    -- Link together all SQEs.
+    maxSqeIndex <- SqeIndex . pred <$> #{peek struct hs_uring, params.sq_entries} u
+    flip mapM_ [SqeIndex 0..maxSqeIndex] $ \sqeIdx ->
+      pokeSqeLink (sqePtr uring sqeIdx) (succ sqeIdx)
+
+    pokeSqeLink (sqePtr uring maxSqeIndex) invalidSqeIndex
+
+    return uring
+
+invalidSqeIndex :: SqeIndex
+invalidSqeIndex = SqeIndex 0xffffffff
 
 -- | An index in the SQ ring.
 newtype SqRingIndex = SqRingIndex Word32
-  deriving (Eq, Ord, Show, Storable)
-
--- | An index of the SQ entries array.
-newtype SqeIndex = SqeIndex Word32
   deriving (Eq, Ord, Show, Storable)
 
 -- | Set the SQE index at the given entry in the SQ array.
@@ -118,28 +134,38 @@ submit uring to_submit min_complete = do
       flags
       nullPtr
 
-pushSQ :: URing -> (Ptr Sqe -> IO (Int, a)) -> IO (Maybe a)
-pushSQ uring push = do
-      -- TODO: Handle overflow
+getSqe :: URing -> IO (Maybe SqeIndex)
+getSqe uring = do
+    sqeIdx <- readPVar (uringFreeSqe uring)
+    if sqeIdx == invalidSqeIndex
+      then return Nothing
+      else do
+        next <- peekSqeLink (sqePtr uring sqeIdx)
+        writePVar (uringFreeSqe uring) next
+        return $ Just sqeIdx
+
+freeSqe :: URing -> SqeIndex -> IO ()
+freeSqe uring sqeIdx = do
+    old <- readPVar (uringFreeSqe uring)
+    pokeSqeLink (sqePtr uring sqeIdx) old
+    writePVar (uringFreeSqe uring) sqeIdx
+
+pushSqe :: URing -> SqeIndex -> IO Bool
+pushSqe uring sqeIdx = do
     tail0 <- peek (uringSQTail $ uringSQ uring)
+    head0 <- peek (uringSQHead $ uringSQ uring)
     readBarrier
     mask <- peek (uringSQRingMask $ uringSQ uring)
-    -- Currently we enforce a one-to-one correspondence between SQs slots and SQEs
-    let sq_index  = SqRingIndex (tail0 .&. mask)
-    let sqe_index = SqeIndex    (tail0 .&. mask)
-    let tail_ptr  = sqePtr uring sqe_index
-    (n_pushed, r) <- push tail_ptr
-
-    flip mapM_ [0..fromIntegral (n_pushed - 1)] $ \i -> do
-        let sq  = SqRingIndex  ((tail0 + i) .&. mask)
-        let sqe = SqeIndex     ((tail0 + i) .&. mask)
-        setSqIndex uring sq sqe
-
-    writeBarrier
-    let tail' = tail0 + fromIntegral n_pushed
-    poke (uringSQTail $ uringSQ uring) tail'
-    writeBarrier
-    return (Just r)
+    let toRingIndex :: Word32 -> SqRingIndex
+        toRingIndex x = SqRingIndex (x .&. mask)
+    if toRingIndex (succ tail0) == toRingIndex head0
+      then return False -- SQ ring full
+      else do
+        setSqIndex uring (toRingIndex tail0) sqeIdx
+        writeBarrier
+        poke (uringSQTail $ uringSQ uring) (succ tail0)
+        writeBarrier
+        return True
 
 popCQ :: URing -> IO (Maybe Cqe)
 popCQ uring = do

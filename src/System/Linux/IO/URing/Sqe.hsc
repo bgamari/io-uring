@@ -1,13 +1,26 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module System.Linux.IO.URing.Sqe
-  ( pollAdd
+  (
+    -- * Operations
+    pollAdd
   , readv
   , writev
-  , sqeSize
+    -- * Types
   , SqeIndex(..)
+  , Sqe
+  , UserData
+  , SqeBuilder
+    -- * Internal
+  , pokeSqe
+  , sqeSize
+  , dumpSqe
+  , peekSqeLink
+  , pokeSqeLink
   ) where
 
 import Data.Word
@@ -15,24 +28,24 @@ import Data.Int
 import System.Posix.Types
 import Foreign.Ptr
 import Foreign.Storable
-import Foreign.C.Types
 import Foreign.Marshal.Utils (fillBytes)
 
 import System.Linux.IO.URing.PollEvent
 import System.Linux.IO.URing.IoVec
+import System.Linux.IO.URing.PVar
 
 #include "io_uring.h"
 
 -- | An index of the SQ entries array.
 newtype SqeIndex = SqeIndex Word32
-  deriving (Eq, Ord, Show, Storable, Enum)
+  deriving (Eq, Ord, Show, Storable, Enum, Prim)
 
 data Sqe
 
 -- | The user data word attached to each SQE.
 type UserData = Word64
 
-newtype SqeBuilder a = SqeBuilder (Ptr Sqe -> IO a)
+newtype SqeBuilder a = SqeBuilder { pokeSqe :: Ptr Sqe -> IO a }
   deriving (Functor)
 
 instance Applicative SqeBuilder where
@@ -57,7 +70,7 @@ pokeField :: (Ptr Sqe -> a -> IO ()) -> a -> SqeBuilder ()
 pokeField f x = SqeBuilder $ \ptr -> f ptr x
 {-# INLINE pokeField #-}
 
-setOpCode :: Int32 -> SqeBuilder ()
+setOpCode :: Word8 -> SqeBuilder ()
 setOpCode = pokeField #{poke struct io_uring_sqe, opcode}
 
 setOff :: Word64 -> SqeBuilder ()
@@ -77,6 +90,12 @@ setFd fd = pokeField #{poke struct io_uring_sqe, fd} (fromIntegral fd :: Word32)
 
 setUserData :: UserData -> SqeBuilder ()
 setUserData = pokeField #{poke struct io_uring_sqe, user_data}
+
+peekSqeLink :: Ptr Sqe -> IO SqeIndex
+peekSqeLink = #{peek struct io_uring_sqe, fd}
+
+pokeSqeLink :: Ptr Sqe -> SqeIndex -> IO ()
+pokeSqeLink = #{poke struct io_uring_sqe, fd}
 
 -- | Poll.
 pollAdd
@@ -100,6 +119,7 @@ readv
   -> UserData
   -> SqeBuilder ()
 readv fd offset iovs iov_cnt userd = do
+    zeroIt
     setOpCode (#const IORING_OP_READV)
     setFd fd
     setOff offset
@@ -117,7 +137,8 @@ writev
   -> UserData
   -> SqeBuilder ()
 writev fd offset iovs iov_cnt userd = do
-    setOpCode (#const IORING_OP_READV)
+    zeroIt
+    setOpCode (#const IORING_OP_WRITEV)
     setFd fd
     setOff offset
     setAddr iovs
