@@ -17,18 +17,20 @@ main :: IO ()
 main = do
     putStrLn "Hello, Haskell!"
     uring <- newURing 128
-
     fd <- openFd "LICENSE" ReadOnly Nothing defaultFileFlags
 
     let len = 1024
     buf <- mallocArray0 len
     let iovecs = [IoVec buf (fromIntegral len)]
+
+    putStrLn "Read some data..."
     withArrayLen iovecs $ \iovecsCnt iovecsPtr -> do
       postSqe uring (readv fd 0 iovecsPtr (fromIntegral iovecsCnt) 1111) >>= print
       submit uring 1 (Just 1) >>= print
       popCQ uring >>= print
 
-    with (Timespec 0 100000000) $ \tsPtr -> do
+    putStrLn "Wait 3s..."
+    with (Timespec 3 0) $ \tsPtr -> do
       postSqe uring (timeout tsPtr 3333)
       submit uring 1 (Just 1) >>= print
       popCQ uring >>= print
@@ -36,6 +38,7 @@ main = do
     closeFd fd
     fd <- openFd "testing" WriteOnly (Just 0o666) defaultFileFlags
 
+    putStrLn "Write some data..."
     withArrayLen iovecs $ \iovecsCnt iovecsPtr -> do
       postSqe uring (writev fd 0 iovecsPtr (fromIntegral iovecsCnt) 2222) >>= print
       n <- submit uring 1 (Just 1)
