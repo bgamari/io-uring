@@ -131,16 +131,34 @@ cqePtr uring (CqeIndex i) =
 
 -- | Notify the kernel of new SQ submissions, optionally blocking until some
 -- have completed.
-submit :: URing
-       -> Int       -- ^ number to submit
-       -> Maybe Int -- ^ minimum to complete
-       -> IO Int
+submit
+  :: URing
+  -> Int       -- ^ number to submit
+  -> Maybe Int -- ^ minimum to complete
+  -> IO Int
 submit uring to_submit min_complete = do
     let flags = if isJust min_complete then #{const IORING_ENTER_GETEVENTS} else 0
-    fmap fromIntegral $ throwErrnoIfMinus1 "io_uring_enter" $ c_io_uring_enter
+    fmap fromIntegral $ throwErrnoIfMinus1 "io_uring_enter" $ c_io_uring_enter_unsafe
       (uringFd uring)
       (fromIntegral to_submit)
       (maybe 0 fromIntegral min_complete)
+      flags
+      nullPtr
+
+-- | Notify the kernel of new SQ submissions blocking until some
+-- have completed. Uses a safe foreign call under the
+-- expectation that this wants to block.
+submitAndWait
+  :: URing
+  -> Int       -- ^ number to submit
+  -> Int       -- ^ minimum to complete
+  -> IO Int
+submitAndWait uring to_submit min_complete = do
+    let flags = #{const IORING_ENTER_GETEVENTS}
+    fmap fromIntegral $ throwErrnoIfMinus1 "io_uring_enter" $ c_io_uring_enter_safe
+      (uringFd uring)
+      (fromIntegral to_submit)
+      (fromIntegral min_complete)
       flags
       nullPtr
 
@@ -284,11 +302,19 @@ foreign import ccall "hs_new_uring"
     c_new_uring :: CInt -> IO (Ptr HsURing)
 foreign import ccall "&hs_free_uring"
     c_free_uring :: FunPtr (Ptr HsURing -> IO ())
-foreign import ccall "io_uring_enter"
-    c_io_uring_enter :: CInt    -- ^ fd
-                     -> CUInt   -- ^ to_submit
-                     -> CUInt   -- ^ min_complete
-                     -> CUInt   -- ^ flags
-                     -> Ptr a   -- ^ sig
-                     -> IO CInt
-
+foreign import ccall safe "io_uring_enter"
+    c_io_uring_enter_safe
+      :: CInt    -- ^ fd
+      -> CUInt   -- ^ to_submit
+      -> CUInt   -- ^ min_complete
+      -> CUInt   -- ^ flags
+      -> Ptr a   -- ^ sig
+      -> IO CInt
+foreign import ccall unsafe "io_uring_enter"
+    c_io_uring_enter_unsafe
+      :: CInt    -- ^ fd
+      -> CUInt   -- ^ to_submit
+      -> CUInt   -- ^ min_complete
+      -> CUInt   -- ^ flags
+      -> Ptr a   -- ^ sig
+      -> IO CInt
