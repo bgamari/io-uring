@@ -39,4 +39,5 @@ executable io-uring
                        bytestring,
                        unix,
                        linux-io-uring
+  ghc-options:         -rtsopts -with-rtsopts=-V0
   default-language:    Haskell2010

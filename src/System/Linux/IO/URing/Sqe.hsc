@@ -202,6 +202,7 @@ nCompletions n userd = timeoutNCompletions Nothing n userd
 timeoutNCompletions :: Maybe (Ptr Timespec) -> Int -> UserData -> SqeBuilder ()
 timeoutNCompletions ts n userd = do
     zeroIt
+    setFd (-1)
     setOpCode #{const IORING_OP_TIMEOUT}
     case ts of
       Just ptr -> setAddr ptr >> setLen 1

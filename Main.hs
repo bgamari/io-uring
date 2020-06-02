@@ -28,7 +28,7 @@ main = do
       submit uring 1 (Just 1) >>= print
       popCQ uring >>= print
 
-    with (Timespec 2 0) $ \tsPtr -> do
+    with (Timespec 0 100000000) $ \tsPtr -> do
       postSqe uring (timeout tsPtr 3333)
       submit uring 1 (Just 1) >>= print
       popCQ uring >>= print
