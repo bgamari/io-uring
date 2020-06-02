@@ -6,6 +6,7 @@ module System.Linux.IO.URing
   , postSqe
   , submit
   , popCq
+  , freeSqe
     -- * Requests
     -- ** Polling
   , pollAdd
