@@ -27,13 +27,13 @@ main = do
     withArrayLen iovecs $ \iovecsCnt iovecsPtr -> do
       postSqe uring (readv fd 0 iovecsPtr (fromIntegral iovecsCnt) 1111) >>= print
       submit uring 1 (Just 1) >>= print
-      popCQ uring >>= print
+      popCq uring >>= print
 
     putStrLn "Wait 3s..."
     with (Timespec 3 0) $ \tsPtr -> do
       postSqe uring (timeout tsPtr 3333)
       submit uring 1 (Just 1) >>= print
-      popCQ uring >>= print
+      popCq uring >>= print
 
     closeFd fd
     fd <- openFd "testing" WriteOnly (Just 0o666) defaultFileFlags
@@ -43,8 +43,8 @@ main = do
       postSqe uring (writev fd 0 iovecsPtr (fromIntegral iovecsCnt) 2222) >>= print
       n <- submit uring 1 (Just 1)
       print n
-      popCQ uring >>= print
-      popCQ uring >>= print
+      popCq uring >>= print
+      popCq uring >>= print
 
     bufBs <- BS.unsafePackCStringLen (castPtr buf, len)
     print bufBs

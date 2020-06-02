@@ -1,24 +1,25 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
 
-module System.Linux.IO.URing where
+module System.Linux.IO.URing
+  ( newURing
+  , postSqe
+  , popCq
+    -- * Requests
+  , nop
+  , fsync
+  , fdatasync
+  , pollAdd
+  , readv
+  , writev
+  , nCompletions
+  , timeout
+  , timeoutNCompletions
+  , Timespec(..)
+  ) where
 
-import System.Posix.Types (Fd)
-
-import System.Linux.IO.URing.PollEvent
-import System.Linux.IO.URing.Cqe
 import System.Linux.IO.URing.Ring
 import System.Linux.IO.URing.Sqe
-
-#include "hs_uring.h"
-
-pollAdd :: URing -> Fd -> Event -> IO URing
-pollAdd uring fd event = do
-  undefined
-
-waitCqe :: URing -> Cqe -> IO ()
-waitCqe cqe = do
-  undefined
 
 postSqe :: URing -> SqeBuilder a -> IO (Maybe a)
 postSqe uring sqe = do
@@ -26,15 +27,9 @@ postSqe uring sqe = do
   case sqeIdx_mb of
     Just sqeIdx -> do
       r <- pokeSqe sqe (sqePtr uring sqeIdx)
-      pushSqe uring sqeIdx
-      return (Just r)
+      pushRes <- pushSqe uring sqeIdx
+      if pushRes
+        then return (Just r)
+        else return Nothing
     Nothing -> return Nothing
 
-popCqes :: URing -> IO [Cqe]
-popCqes = undefined
-
-readBarrier :: IO ()
-readBarrier = undefined
-
-writeBarrier :: IO ()
-writeBarrier = undefined

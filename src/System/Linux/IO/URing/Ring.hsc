@@ -11,7 +11,7 @@ module System.Linux.IO.URing.Ring
   , freeSqe
   , pushSqe
   , sqePtr
-  , popCQ
+  , popCq
   ) where
 
 import GHC.Base
@@ -181,8 +181,8 @@ pushSqe uring sqeIdx = do
         return True
 
 -- | Pop a completion off of the completion queue.
-popCQ :: URing -> IO (Maybe Cqe)
-popCQ uring = do
+popCq :: URing -> IO (Maybe Cqe)
+popCq uring = do
     hd <- peek $ uringCQHead $ uringCQ uring
     tl <- peek $ uringCQTail $ uringCQ uring
     if hd == tl
