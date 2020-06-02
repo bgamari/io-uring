@@ -127,3 +127,25 @@ writev fd offset iovs iov_cnt userd = do
 
 sqeSize :: Integral a => a
 sqeSize = #{size struct io_uring_sqe}
+
+dumpSqe :: Ptr Sqe -> IO String
+dumpSqe ptr =
+    unlines <$> sequenceA fields
+  where
+    fields =
+      [ showIt @Word8  "opcode"  #{peek struct io_uring_sqe, opcode}
+      , showIt @Word8  "flags"   #{peek struct io_uring_sqe, flags}
+      , showIt @Word16 "ioprio"  #{peek struct io_uring_sqe, ioprio}
+      , showIt @Int32  "fd"      #{peek struct io_uring_sqe, fd}
+      , showIt @Word64 "offset"  #{peek struct io_uring_sqe, off}
+      , showIt @Word64 "addr"    #{peek struct io_uring_sqe, addr}
+      , showIt @Word32 "len"     #{peek struct io_uring_sqe, len}
+      , showIt @Word32 "other"   #{peek struct io_uring_sqe, fsync_flags}
+      , showIt @Word64 "userd"   #{peek struct io_uring_sqe, user_data}
+      ]
+
+    showIt :: forall a. (Show a, Storable a)
+           => String -> (Ptr Sqe -> IO a) -> IO String
+    showIt name peekField = do
+      val <- peekField ptr
+      return $ name ++ " = " ++ show val
