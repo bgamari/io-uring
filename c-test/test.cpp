@@ -1,6 +1,7 @@
 extern "C" {
 #include <linux/io_uring.h>
 #include <sys/uio.h>
+#include <sys/epoll.h>
 #include <fcntl.h>
 
 #include "syscall.h"
@@ -10,6 +11,7 @@ extern "C" {
 #include <system_error>
 #include <cstdint>
 #include <cassert>
+#include <iostream>
 #include <functional>
 
 inline void write_barrier() { __asm__ __volatile__("":::"memory"); }
@@ -60,6 +62,10 @@ public:
       sqe_arr((struct io_uring_sqe*)uring->sqe_aperture)
   {}
 #undef APERT_OFF
+
+  int fd() const {
+    return this->uring->uring_fd;
+  }
 
   void push_sqe(struct io_uring_sqe sqe) {
     const uint32_t tail = *this->sq_tail;
@@ -128,7 +134,23 @@ int main() {
     .user_data = 0xdeadbeef
   };
   uring.push_sqe(sqe);
-  int ret = uring.enter_wait(1, 1);
+  int ret = 0;
+  ret = uring.enter(1, 0, 0);
+
+  int epoll_fd = epoll_create(16);
+  struct epoll_event events[1] = { EPOLLIN, (void*) 42 };
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, uring.fd(), events) != 0) {
+    std::error_code errcode(errno, std::system_category());
+    throw std::system_error(errcode, "io_uring_enter");
+  }
+  ret = epoll_wait(epoll_fd, events, 1, -1);
+  if (ret == -1) {
+    std::error_code errcode(errno, std::system_category());
+    throw std::system_error(errcode, "io_uring_enter");
+  } else {
+    std::cout << "epoll completed: " << events[0].data.u64 << std::endl;
+  }
+  std::cout << "RET: " << ret << std::endl;
 
   printf("%d\n", ret);
   for (int i=0; i<128; i++)
