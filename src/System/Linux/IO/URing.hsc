@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module System.Linux.IO.URing
   ( newURing
@@ -25,6 +26,8 @@ module System.Linux.IO.URing
     -- ** Miscellaneous
   , nop
   ) where
+
+import GHC.Base
 
 import System.Linux.IO.URing.IoVec
 import System.Linux.IO.URing.Ring

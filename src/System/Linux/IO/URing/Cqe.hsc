@@ -1,17 +1,21 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module System.Linux.IO.URing.Cqe (Cqe(..), CqeIndex(..))  where
 
 import Data.Word
 import Data.Int
 import Foreign.Storable
+import Control.Applicative
+import GHC.Base
+import GHC.Show
 
 #include <linux/io_uring.h>
 
 -- | An index of the CQ entries array.
 newtype CqeIndex = CqeIndex Word32
-  deriving (Eq, Ord, Show, Enum)
+  deriving (Eq, Ord, Show)
 
 -- | Completion Queue Entry
 data Cqe

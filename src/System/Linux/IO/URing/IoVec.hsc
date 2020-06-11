@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module System.Linux.IO.URing.IoVec
   ( IoVec(..)
@@ -8,6 +9,9 @@ import Data.Word
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.Types
+import Control.Applicative
+import GHC.Base
+import GHC.Show
 
 #include <sys/uio.h>
 

@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module System.Linux.IO.URing.Ring
   ( URing
@@ -14,10 +15,16 @@ module System.Linux.IO.URing.Ring
   , popCq
   ) where
 
-import GHC.Base
+import Control.Applicative
 import Data.Bits
 import Data.Maybe
 import Data.Word
+import Data.Foldable (mapM_)
+import GHC.Num
+import GHC.Enum
+import GHC.Real
+import GHC.Show
+import GHC.Base
 
 import Foreign.C.Error
 import Foreign.C.Types (CInt(..), CUInt(..))

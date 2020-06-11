@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module System.Linux.IO.URing.Sqe
   (
@@ -40,6 +41,11 @@ import System.Posix.Types
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.Marshal.Utils (fillBytes)
+import GHC.Base
+import GHC.Show
+import GHC.Enum
+import GHC.Real
+import Control.Applicative
 
 import System.Linux.IO.URing.PollEvent
 import System.Linux.IO.URing.IoVec
@@ -255,6 +261,7 @@ sqeSize = #{size struct io_uring_sqe}
 -----------------------------------------------------------------------------
 
 dumpSqe :: Ptr Sqe -> IO String
+#if defined(DEBUG)
 dumpSqe ptr =
     unlines <$> sequenceA fields
   where
@@ -275,3 +282,6 @@ dumpSqe ptr =
     showIt name peekField = do
       val <- peekField ptr
       return $ name ++ " = " ++ show val
+#else
+dumpSqe _ = return ""
+#endif

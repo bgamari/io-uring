@@ -2,12 +2,14 @@
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -- | Memory barriers.
 module System.Linux.IO.URing.Barrier (readBarrier, writeBarrier) where
 
 import GHC.IO
 import GHC.Exts
+import GHC.Base (($))
 
 -- TODO: Ideally these would be primops
 foreign import prim "uring_write_barrier"

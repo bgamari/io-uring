@@ -2,6 +2,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module System.Linux.IO.URing.PVar
   ( PVar
@@ -12,6 +13,7 @@ module System.Linux.IO.URing.PVar
 import GHC.Exts
 import GHC.IO
 import GHC.Word
+import GHC.Base
 
 data PVar a = PVar (MutableByteArray# RealWorld)
 

@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module System.Linux.IO.URing.PollEvent
     ( Event(..)
@@ -11,6 +12,9 @@ module System.Linux.IO.URing.PollEvent
 import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
 import Foreign.C.Types (CShort(..))
 import Foreign.Storable (Storable(..))
+import GHC.Num
+import GHC.Show
+import GHC.Base
 
 -- | A @poll@ event mask.
 newtype Event = Event CShort
