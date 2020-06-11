@@ -45,7 +45,7 @@ import System.Linux.IO.URing.PollEvent
 import System.Linux.IO.URing.IoVec
 import System.Linux.IO.URing.PVar
 
-#include "io_uring.h"
+#include <linux/io_uring.h>
 
 -----------------------------------------------------------------------------
 -- Types

@@ -7,7 +7,7 @@ import Data.Word
 import Data.Int
 import Foreign.Storable
 
-#include "io_uring.h"
+#include <linux/io_uring.h>
 
 -- | An index of the CQ entries array.
 newtype CqeIndex = CqeIndex Word32
