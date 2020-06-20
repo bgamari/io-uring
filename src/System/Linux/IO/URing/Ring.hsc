@@ -7,6 +7,7 @@ module System.Linux.IO.URing.Ring
   ( URing
   , newURing
   , submit
+  , submitAndWait
   , getSqe
   , freeSqe
   , pushSqe

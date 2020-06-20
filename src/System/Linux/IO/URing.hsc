@@ -5,6 +5,7 @@ module System.Linux.IO.URing
   ( newURing
   , postSqe
   , submit
+  , submitAndWait
   , popCq
   , freeSqe
     -- * Requests
