@@ -284,7 +284,7 @@ data HsURing
     = HsURing { sqeAperture :: !(Ptr Sqe)
               , sqAperture  :: !(Ptr ())
               , cqAperture  :: !(Ptr ())
-              , hsURingFd     :: !CInt
+              , hsURingFd   :: !CInt
               , params      :: !IOURingParams
               }
 
