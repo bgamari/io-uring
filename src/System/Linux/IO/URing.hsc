@@ -2,9 +2,11 @@
 {-# LANGUAGE DataKinds #-}
 
 module System.Linux.IO.URing
-  ( newURing
+  ( URing
+  , newURing
   , postSqe
   , submit
+  , submitAndWait
   , popCq
   , freeSqe
     -- * Requests
