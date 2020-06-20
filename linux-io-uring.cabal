@@ -11,6 +11,8 @@ maintainer:          ben@smart-cactus.org
 copyright:           (c) 2019 Ben Gamari
 category:            System
 build-type:          Simple
+extra-source-files:  include/hs_uring.h
+                     include/syscall.h
 
 library
   exposed-modules:     System.Linux.IO.URing
