@@ -7,6 +7,7 @@ module System.Linux.IO.URing.Ring
   ( URing
   , newURing
   , submit
+  , submitAndWait
   , getSqe
   , freeSqe
   , pushSqe
@@ -283,7 +284,7 @@ data HsURing
     = HsURing { sqeAperture :: !(Ptr Sqe)
               , sqAperture  :: !(Ptr ())
               , cqAperture  :: !(Ptr ())
-              , hsURingFd     :: !CInt
+              , hsURingFd   :: !CInt
               , params      :: !IOURingParams
               }
 
