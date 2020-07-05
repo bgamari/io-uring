@@ -12,6 +12,7 @@ module System.Linux.IO.URing
     -- * Requests
     -- ** Polling
   , pollAdd
+  , pollRemove
     -- ** Timeout
   , nCompletions
   , timeout

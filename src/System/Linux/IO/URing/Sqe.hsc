@@ -11,6 +11,7 @@ module System.Linux.IO.URing.Sqe
   , fsync
   , fdatasync
   , pollAdd
+  , pollRemove
   , readv
   , writev
   , nCompletions
@@ -142,7 +143,7 @@ chained = modifyFlags (.|. iO_LINK)
 -- Command types
 -----------------------------------------------------------------------------
 
--- | Poll.
+-- | Poll a file descriptor for the specified events.
 pollAdd
   :: Fd
   -> Event
@@ -154,6 +155,17 @@ pollAdd fd events userd = do
     setFd fd
     setUserData userd
     pokeField #{poke struct io_uring_sqe, poll_events} events
+
+-- | Cancel a previously issued poll request.
+pollRemove
+  :: UserData
+  -> UserData
+  -> SqeBuilder ()
+pollRemove toCancel userd = do
+    zeroIt
+    setOpCode (#const IORING_OP_POLL_REMOVE)
+    setAddr $ wordPtrToPtr $ fromIntegral toCancel
+    setUserData userd
 
 -- | No operation.
 nop :: UserData -> SqeBuilder ()
