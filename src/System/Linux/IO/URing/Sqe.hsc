@@ -12,6 +12,8 @@ module System.Linux.IO.URing.Sqe
   , fdatasync
   , pollAdd
   , pollRemove
+  , read
+  , write
   , readv
   , writev
   , nCompletions
@@ -41,6 +43,7 @@ import System.Posix.Types
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.Marshal.Utils (fillBytes)
+import Prelude hiding (read)
 
 import System.Linux.IO.URing.PollEvent
 import System.Linux.IO.URing.IoVec
@@ -220,6 +223,42 @@ timeoutNCompletions ts n userd = do
       Just ptr -> setAddr ptr >> setLen 1
       Nothing  -> return ()
     setOff (fromIntegral n)
+    setUserData userd
+
+-- | Non-vectored read.
+read
+  :: Fd         -- ^ 'Fd' to read from
+  -> Ptr Word8  -- ^ destination buffer
+  -> Word32     -- ^ length of read
+  -> Word64     -- ^ offset in bytes
+  -> UserData
+  -> SqeBuilder ()
+read fd buf len off userd = do
+    zeroIt
+    setOpCode (#const IORING_OP_READ)
+    setFd fd
+    setOff off
+    setAddr buf
+    setLen len
+    setFlags 0
+    setUserData userd
+
+-- | Non-vectored write.
+write
+  :: Fd         -- ^ 'Fd' to write to
+  -> Ptr Word8  -- ^ source buffer
+  -> Word32     -- ^ length of write
+  -> Word64     -- ^ offset in bytes
+  -> UserData
+  -> SqeBuilder ()
+write fd buf len off userd = do
+    zeroIt
+    setOpCode (#const IORING_OP_WRITE)
+    setFd fd
+    setOff off
+    setAddr buf
+    setLen len
+    setFlags 0
     setUserData userd
 
 -- | Vectored read.
