@@ -1,7 +1,10 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE UnboxedTuples #-}
+
+#define WITH_BARRIERS
 
 -- | Memory barriers.
 module System.Linux.IO.URing.Barrier (readBarrier, writeBarrier) where
@@ -16,11 +19,21 @@ foreign import prim "uring_read_barrier"
     hs_readBarrier :: State# RealWorld -> (# State# RealWorld #)
 
 readBarrier :: IO ()
-readBarrier = IO $ \s ->
-  case hs_readBarrier s of
-    (# s' #) -> (# s', () #)
+readBarrier =
+#if defined(WITH_BARRIERS)
+  IO $ \s ->
+    case hs_readBarrier s of
+      (# s' #) -> (# s', () #)
+#else
+  return ()
+#endif
 
 writeBarrier :: IO ()
-writeBarrier = IO $ \s ->
-  case hs_writeBarrier s of
-    (# s' #) -> (# s', () #)
+writeBarrier =
+#if defined(WITH_BARRIERS)
+  IO $ \s ->
+    case hs_writeBarrier s of
+      (# s' #) -> (# s', () #)
+#else
+  return ()
+#endif
