@@ -11,16 +11,16 @@ import GHC.Exts
 
 -- TODO: Ideally these would be primops
 foreign import prim "uring_write_barrier"
-    hs_writeBarrier :: State# RealWorld -> (# State# RealWorld, () #)
+    hs_writeBarrier :: State# RealWorld -> (# State# RealWorld #)
 foreign import prim "uring_read_barrier"
-    hs_readBarrier :: State# RealWorld -> (# State# RealWorld, () #)
+    hs_readBarrier :: State# RealWorld -> (# State# RealWorld #)
 
 readBarrier :: IO ()
 readBarrier = IO $ \s ->
   case hs_readBarrier s of
-    (# s', _ #) -> (# s', () #)
+    (# s' #) -> (# s', () #)
 
 writeBarrier :: IO ()
 writeBarrier = IO $ \s ->
   case hs_writeBarrier s of
-    (# s', _ #) -> (# s', () #)
+    (# s' #) -> (# s', () #)
